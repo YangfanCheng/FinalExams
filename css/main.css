@@ -1,0 +1,68 @@
+body
+{
+    background-color: #222222;
+    color: white;
+    padding-top: 2%;
+    padding-bottom: 2%;
+}
+
+.center
+{
+    text-align: center;
+}
+
+.text
+{
+    max-width: 600px;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#lightbox {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, .6);
+    color: #222;
+    z-index: 999;
+}
+
+.aligned
+{
+    display: inline-block;
+    height: 100%;
+    vertical-align: middle;
+}
+
+#search, #results
+{
+    background-color: #222222;
+    color: white;
+    padding: 6px 6px;
+    border: 1px solid #CCC;
+    border-radius: 4px;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.075) inset;
+}
+
+#results
+{
+    display: block;
+    width: 100%;
+    height: 200px;
+    overflow-y: scroll;
+}
+
+.result
+{
+    cursor: default;
+    text-align: left;
+}
+
+.export, .fakelink { cursor: pointer; }
+
+.padded { padding-left: 3px; padding-right: 3px; }
+
+.underlined { text-decoration: underline; }

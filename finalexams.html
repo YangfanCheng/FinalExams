@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head lang="en">
+    <meta charset="UTF-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <link rel="icon" href="favicon.ico">
+    <title>NJIT Final Exams Schedule Builder</title>
+    <meta name="description" content="Schedule builder/organizer for final exams at NJIT.">
+    <meta name="keywords" content="NJIT, finals, final exams, exams, schedule, builder, organizer">
+    <meta name="author" content="Shahar Sarfati">
+    <meta name="viewport" content="width=device-width, user-scalable=no">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css">
+    <link rel="stylesheet" type="text/css" href="css/main.css">
+    <link rel="stylesheet" type="text/css" href="css/font-awesome.min.css">
+    <script type="text/javascript" src="js/jquery-2.1.3.min.js"></script>
+    <script type="text/javascript" src="js/jquery.mobile.custom.min.js"></script>
+    <script type="text/javascript" src="js/lunr.min.js"></script>
+    <script>
+        $(function() {
+            var personal = [], schedule_data = [];
+            var search = lunr(function () {
+                this.field('course');
+                this.field('section');
+                this.field('title')
+            });
+            $.get('finalexams.php', function(data) {
+                var contents = $('<div/>').html(data).contents();
+                var title = $(contents.find('#main header h1')[0]).text();
+                $('#source').html('<span style="color: grey;">Source</span>: <a href="http://www.njit.edu/registrar/exams/finalexams.php" style="color: white;">' + title + '</a>');
+                var tables = contents.find('#extcontent tbody tr');
+                var children, date, split, temp;
+                var course, section;
+                for (var i=0; i < tables.length; i++)
+                {
+                    children = tables[i].cells;
+                    course = children[0].innerHTML.replace(/([a-z])(?=[0-9])/ig, "$1 ").toUpperCase();
+                    section = children[1].innerHTML;
+                    title = children[2].innerHTML.toUpperCase();
+                    temp = {
+                        "id": i,
+                        "course": course,
+                        "section": section,
+                        "title": title
+                    };
+                    search.add(temp);
+                    temp = [];
+                    temp['text'] = course + " (" + section + "): " + title;
+                    date = children[3].innerHTML + ' ';
+                    temp['time_text'] = children[4].innerHTML;
+                    split = children[4].innerHTML.split('-');
+                    temp['start_date'] = new Date(date + split[0]);
+                    temp['end_date'] = new Date(date + split[1]);
+                    temp['place'] = children[5].innerHTML + " " + children[6].innerHTML;
+                    schedule_data.push(temp);
+                }
+                $('#lightbox').fadeOut();
+                //$('#search').keyup();
+            });
+
+            $(document).on('keyup','#search',function() {
+                var div = $('#results');
+                var results = search.search(this.value);
+                div.empty();
+                var index;
+                for (var i = 0; i < results.length; i++)
+                {
+                    index = results[i]['ref'];
+                    div.append('<div class="result" data-val="' + index + '">' + schedule_data[index]['text'] + '</span>');
+                }
+            });
+
+            $(document).on('keydown', '#search', function(e) {
+                var options;
+                if(e.keyCode == '13' && (options = $('.result')).length > 0)
+                { addClass($(options[0]).data('val')); }
+            });
+
+            $(document).on('vclick', '.result', function() {
+                addClass($(this).data('val'));
+            });
+
+            function addClass(id)
+            {
+                $('#search').val('');
+                $('#results').blur();
+                $('.result').fadeOut(400, function() { $('#results').empty(); });
+                $('#status').fadeOut(400, function() { $(this).html('<i class="fa fa-check"></i> Added ' + schedule_data[id]['text']).fadeIn(); });
+                personal.push(id);
+                makeSchedule();
+            }
+
+            function makeSchedule()
+            {
+                var index, date, txt, tmp,tmp2, pt, i, j;
+                var data = [];
+                for (i = 0; i < personal.length; i++)
+                {
+                    pt = personal[i];
+                    date = schedule_data[pt]["start_date"];
+                    txt = getday(date.getDay()) + ', ' + (date.getMonth()+1) + '/' + date.getDate() + '/' + date.getFullYear();
+
+                    index = -1;
+                    for (j = 0; j < data.length; j++)
+                    {
+                        if (data[j]["day"] == txt) { index = j; }
+                    }
+
+                    tmp = [];
+                    if (index > -1)
+                    {
+                        tmp["id"] = pt;
+                        tmp["start"] = date.getTime();
+                        data[index]["tests"].push(tmp);
+                    } else {
+                        tmp = [];
+                        tmp["day"] = txt;
+                        tmp["stamp"] = date.getTime();
+                        tmp["tests"] = [];
+                        tmp2 = [];
+                        tmp2["id"] = pt;
+                        tmp2["start"] = date.getTime();
+                        tmp["tests"].push(tmp2);
+                        data.push(tmp);
+                    }
+                }
+                data.sort(function(a,b) { return a["stamp"]-b["stamp"]; } ); //sort the days
+                var schedule = $('#schedule'), id, tests;
+                schedule.html('<h1><i class="fa fa-clock-o fa-border"></i> Your schedule:</h1>').fadeIn('slow');
+                for (i = 0; i < data.length; i++)
+                {
+                    schedule.append('<h2>' + data[i]["day"] + ':</h2><ul>');
+                    data[i]["tests"].sort(function(a,b){ return a["start"]-b["start"]; });
+                    tests = data[i]["tests"];
+                    for (j = 0; j < tests.length; j++)
+                    {
+                        id = tests[j]["id"];
+                        schedule.append('<li><b class="underlined">' + schedule_data[id]["time_text"] + ':</b> ' + schedule_data[id]["text"] + ' @ <b>' + schedule_data[id]["place"] + '</b> <i class="remove fa fa-times-circle" data-id="' + id + '"></i></li>');
+                    }
+                    schedule.append('</ul>');
+                }
+
+                schedule.append('<div id="note" style="text-align: center;"><small>Export: <a class="export" data-type=0>print</a> &sdot; <a class="export" data-type=1>add to calendar</a></small></div>');
+            }
+
+            function getday(day)
+            {
+                switch(day)
+                {
+                    case 0: return 'Sunday';
+                    case 1: return 'Monday';
+                    case 2: return 'Tuesday';
+                    case 3: return 'Wednesday';
+                    case 4: return 'Thursday';
+                    case 5: return 'Friday';
+                    case 6: return 'Saturday';
+                }
+            }
+
+            $(document).on('vclick', '.remove', function() {
+                var id = $(this).data('id');
+                $('#status').fadeOut(400, function() { $(this).html('<i class="fa fa-times"></i> Removed ' + schedule_data[id]['text']).fadeIn(); });
+                personal.splice(personal.indexOf(id), 1);
+                makeSchedule();
+                if (personal.length == 0)
+                {
+                    $('#schedule').html('');
+                }
+            });
+
+            $(document).on('vclick', '.export', function() {
+                var type = $(this).data('type');
+                switch (type)
+                {
+                    case 0: //print
+                        download_print();
+                        break;
+                    case 1: //ics
+                        download_ics();
+                        break;
+                    default:  //maybe one day I'll add some other things
+                        alert('Stop hacking \\_(o_o)_/.');
+                        break;
+                }
+            });
+
+            function download_print()
+            {
+                var win = window.open();
+                $(win.document.head).html('<base href="https://web.njit.edu/~ss2666/"><link rel="stylesheet" type="text/css" href="css/bootstrap.min.css"><link rel="stylesheet" type="text/css" href="css/font-awesome.min.css">');
+                var sched = $('#schedule').clone();
+                sched.find('#note').css('text-align', 'left').html('<br>Generated using a tool by Shahar Sarfati, available at <a>https://web.njit.edu/~ss2666/finalexams.html</a>. Good luck on your final exams!');
+                sched.find('.remove').remove();
+                $(win.document.body).html('<div style="margin: 8px;">' + sched.html() + '</div>');
+            }
+
+            function download_ics()
+            {
+                if(typeof(Storage) !== "undefined") {
+                    sessionStorage.setItem('ics_name', 'FinalExams');
+                    sessionStorage.setItem('ics_data', build_ics());
+                    window.open('save_ics.html');
+                }
+            }
+
+            //no point in using a JS library for this
+            function build_ics()
+            {
+                var data = "BEGIN:VCALENDAR\nVERSION:2.0";
+                var arr, txt;
+                for (var i = 0; i < personal.length; i++)
+                {
+                    arr = schedule_data[personal[i]];
+                    txt = arr['text'];
+                    data += "\nBEGIN:VEVENT\nCLASS:PUBLIC";
+                    data += "\nDESCRIPTION:Final exam for " + txt + " is today at " + arr['time_text'] + ". Shahar wishes you good luck!";
+                    data += "\nDTSTART;VALUE=DATE:" + formatDate(arr["start_date"]);
+                    data += "\nDTEND;VALUE=DATE:" + formatDate(arr["end_date"]);
+                    data += "\nLOCATION:" + arr['place'];
+                    data += "\nSUMMARY;LANGUAGE=en-us:" + "Final Exam for " + txt;
+                    data += "\nTRANSP:TRANSPARENT\nEND:VEVENT";
+                }
+                data += "\nEND:VCALENDAR";
+                return data;
+            }
+
+            function formatDate(date)
+            {
+                var mins;
+                return date.getFullYear() + zerofy(date.getMonth()+1, 2) + zerofy(date.getDate(), 2) + "T" + zerofy(date.getHours(), 2) + (mins = zerofy(date.getMinutes(), 2)) + mins;
+            }
+
+            function zerofy(value, amt)
+            {
+                var ret = value + '';
+                while (ret.length < amt)
+                {
+                    ret = "0" + ret;
+                }
+                return ret;
+            }
+        });
+    </script>
+</head>
+<body class="center">
+    <div id="lightbox"><span class="aligned"></span><i class="fa fa-spinner fa-spin fa-5x"></i></div>
+    <i class="fa fa-book fa-5x"></i>
+    <h1><kbd>Final Exams Schedule Builder</kbd></h1>
+    by Shahar Sarfati
+
+    <div style="position: fixed; right: 0; bottom:0;" id="source"></div>
+    <h1>Select your courses</h1>
+    <div class="well text" style="background-color: white;">
+        <div class="input-group">
+            <input type="text" id="search" class="form-control">
+            <div class="input-group-addon" style="background-color: #222; color: white;"><i class="fa fa-search"></i></div>
+        </div>
+        <br>
+        <div id="results" class="form-control">
+        </div>
+        <div style="text-align: right; color:black; margin-top: 4px;" id="status"><i>To add a course, click on it or press 'enter'.</i></div>
+    </div>
+
+    <div id="schedule" class="text padded" style="text-align: left; margin-bottom: 20px;">
+    </div>
+</body>
+</html>
